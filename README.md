@@ -21,3 +21,6 @@ save some algorithm and data structure used in work !
 + CompressMap
 + STLAllocator
   - replace std::allocator for memory statistics
++ CMake Sample
+  - make visual studio project
+  - has a static lib and a MFC application
