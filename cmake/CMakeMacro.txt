@@ -1,0 +1,116 @@
+################################
+# test hello
+macro(hello_macro)
+    MESSAGE(STATUS "---------------------- hello macro begin")
+    MESSAGE(STATUS "This is BINARY dir ${PROJECT_BINARY_DIR}")
+	MESSAGE(STATUS "This is SOURCE dir ${PROJECT_SOURCE_DIR}")
+	MESSAGE(STATUS "---------------------- hello macro end")
+endmacro(hello_macro)
+
+################################
+# 设置vs filter
+# sgbd_cur_dir 根目录
+# prefix_group 前缀filter
+# source_files 文件列表(一定是完整路径)
+macro(source_group_by_dir sgbd_cur_dir prefix_group source_files)
+    if(MSVC)
+		GET_FILENAME_COMPONENT(cur_dir ${sgbd_cur_dir} ABSOLUTE)
+		MESSAGE(STATUS "----------------------")
+        MESSAGE(STATUS "根目录 ${cur_dir}")
+        foreach(sgbd_file ${${source_files}})
+			GET_FILENAME_COMPONENT(myfile ${sgbd_file} ABSOLUTE)
+			if(NOT EXISTS ${myfile})
+				MESSAGE(STATUS "路径错误 ${myfile} is not exists")
+			endif(NOT EXISTS ${myfile})
+            string(REGEX REPLACE ${cur_dir}/\(.*\) \\1 sgbd_fpath ${myfile})
+            string(REGEX REPLACE "\(.*\)/.*" \\1 sgbd_group_name ${sgbd_fpath})
+            string(COMPARE EQUAL ${sgbd_fpath} ${sgbd_group_name} sgbd_nogroup)
+            string(REPLACE "/" "\\" sgbd_group_name ${sgbd_group_name})
+            if(sgbd_nogroup)
+                set(sgbd_group_name "")
+            endif(sgbd_nogroup)
+            set(sgbd_group_name "${prefix_group}\\${sgbd_group_name}")
+            MESSAGE(STATUS "filter ${sgbd_group_name} - ${myfile}")
+            source_group(${sgbd_group_name} FILES ${myfile})
+        endforeach(sgbd_file)
+    endif(MSVC)
+endmacro(source_group_by_dir)
+
+################################
+# 转换为相对路径
+macro(convert_relative basr_dir src_list)
+	UNSET(TMP_LIST)
+	FOREACH(myfile ${${src_list}})
+		FILE(RELATIVE_PATH myfile ${${basr_dir}} ${myfile})
+		LIST(APPEND TMP_LIST "${myfile}")
+	ENDFOREACH(myfile ${${src_list}})
+	SET(${src_list} ${TMP_LIST})
+	UNSET(TMP_LIST)
+endmacro(convert_relative)
+
+################################
+# 规范绝对路径
+macro(normal_absolute src_list)
+	UNSET(TMP_LIST)
+	FOREACH(myfile ${${src_list}})
+		GET_FILENAME_COMPONENT(myfile ${myfile} ABSOLUTE)
+		LIST(APPEND TMP_LIST "${myfile}")
+	ENDFOREACH(myfile ${${src_list}})
+	SET(${src_list} ${TMP_LIST})
+	UNSET(TMP_LIST)
+endmacro(normal_absolute)
+
+################################
+# x86 x64判断
+if(CMAKE_SIZEOF_VOID_P EQUAL 4)
+	MESSAGE(STATUS "x86")
+	set(HAVE_64_BIT 0)
+	set(BIT_FLAG "x86")
+else(CMAKE_SIZEOF_VOID_P EQUAL 4)
+	MESSAGE(STATUS "x86")
+	set(HAVE_64_BIT 1)
+	set(BIT_FLAG "x64")
+endif(CMAKE_SIZEOF_VOID_P EQUAL 4)
+
+################################
+# 设置vs 基础属性
+macro(init_base_vs)
+	# 设置vs 是否使用相对路径
+	SET(CMAKE_USE_RELATIVE_PATHS OFF CACHE BOOL "" FORCE)
+	MESSAGE(STATUS "CMAKE_USE_RELATIVE_PATHS ${CMAKE_USE_RELATIVE_PATHS}")
+
+	# 设置vs compile config
+	if(MSVC)
+		set(CMAKE_CXX_FLAGS_DEBUG "/D_DEBUG /D_MBCS /MTd /Zi /Ob0 /Od /RTC1"
+			CACHE STRING "" FORCE)
+		set(CMAKE_CXX_FLAGS_RELEASE "/MT /O2 /Ob2 /D NDEBUG /D_MBCS"
+			CACHE STRING "" FORCE)
+		#set(CMAKE_CONFIGURATION_TYPES "Debug;Release" CACHE STRING "Configs" FORCE)
+		unset(CMAKE_C_FLAGS_MINSIZEREL CACHE)
+		unset(CMAKE_C_FLAGS_RELWITHDEBINFO CACHE)
+		unset(CMAKE_CXX_FLAGS_MINSIZEREL CACHE)
+		unset(CMAKE_CXX_FLAGS_RELWITHDEBINFO CACHE)
+		unset(CMAKE_EXE_LINKER_FLAGS_MINSIZEREL CACHE)
+		unset(CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO CACHE)
+		unset(CMAKE_MODULE_LINKER_FLAGS_MINSIZEREL CACHE)
+		unset(CMAKE_MODULE_LINKER_FLAGS_RELWITHDEBINFO CACHE)
+		unset(CMAKE_SHARED_LINKER_FLAGS_MINSIZEREL CACHE)
+		unset(CMAKE_SHARED_LINKER_FLAGS_RELWITHDEBINFO CACHE)
+		unset(CMAKE_STATIC_LINKER_FLAGS_MINSIZEREL CACHE)
+		unset(CMAKE_STATIC_LINKER_FLAGS_RELWITHDEBINFO CACHE)
+	endif()
+	MESSAGE(STATUS "CMAKE_CXX_FLAGS_DEBUG ${CMAKE_CXX_FLAGS_DEBUG}")
+	MESSAGE(STATUS "CMAKE_CXX_FLAGS_RELEASE ${CMAKE_CXX_FLAGS_RELEASE}")
+
+	# 设置vs config
+	if(CMAKE_CONFIGURATION_TYPES STREQUAL "Debug;Release;MinSizeRel;RelWithDebInfo")
+		set(CMAKE_CONFIGURATION_TYPES "Debug;Release" CACHE STRING "" FORCE)
+	endif(CMAKE_CONFIGURATION_TYPES STREQUAL "Debug;Release;MinSizeRel;RelWithDebInfo")
+	MESSAGE(STATUS "CMAKE_CONFIGURATION_TYPES ${CMAKE_CONFIGURATION_TYPES}")
+endmacro(init_base_vs)
+
+################################
+# 设置project基础属性
+macro(init_base_project)
+	init_base_vs()
+endmacro(init_base_project)
