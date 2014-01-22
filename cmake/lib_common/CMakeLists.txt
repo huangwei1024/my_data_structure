@@ -29,3 +29,10 @@ source_group_by_dir(${SRC_DIR} "source" SRC_LIST)
 source_group_by_dir(${HED_DIR} "header" HED_LIST)
 
 
+################################
+# °²×°
+INSTALL(TARGETS lib_common
+	RUNTIME DESTINATION bin
+    LIBRARY DESTINATION lib
+	ARCHIVE DESTINATION lib/static
+)

@@ -119,4 +119,8 @@ TARGET_LINK_LIBRARIES(pngtool
 
 ################################
 # °²×°
-INSTALL(FILES pngtool DESTINATION "/bin")
+INSTALL(TARGETS pngtool
+	RUNTIME DESTINATION bin
+    LIBRARY DESTINATION lib
+	ARCHIVE DESTINATION lib/static
+)
