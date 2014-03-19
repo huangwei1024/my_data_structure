@@ -29,6 +29,7 @@ save some algorithm and data structure used in work !
 
 
 
+![ttt](http://latex.codecogs.com/gif.latex?%5Csum_%7Bi%3D1%7D%5E%7Bn%7D%20x_%7Bi%7D%5E%7B2%7D%5Cprod%20%5Cprod_%7B1%7D%5E%7B2%7D)
 
 Here is an example MathJax inline rendering \\( 1/x^{2} \\), and here is a block rendering: 
 \\[ \frac{1}{n^{2}} \\]
