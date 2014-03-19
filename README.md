@@ -24,3 +24,10 @@ save some algorithm and data structure used in work !
 + CMake Sample
   - make visual studio project
   - has a static lib and a MFC application
+
+
+<script type="text/javascript" src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=default"></script>
+
+asd
+
+$$x_{1,2} = \frac{-b \pm \sqrt{b^2-4ac}}{2b}.$$
