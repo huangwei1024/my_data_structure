@@ -1,3 +1,5 @@
+<script type="text/javascript" src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=default"></script>
+
 my_lib
 ======
 
@@ -26,7 +28,7 @@ save some algorithm and data structure used in work !
   - has a static lib and a MFC application
 
 
-<script type="text/javascript" src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=default"></script>
+
 
 asd
 
