@@ -40,8 +40,8 @@ chanke_Referer, chanke_Name = cks[0]
 chanke_Choice = 0
 doctorname_Choice = ''
 
-yzm_filename = 'yzm.png'
-loginyzm_filename = 'yyzm.png'
+yzm_filename = 'yyzm.png'
+loginyzm_filename = 'yzm.png'
 
 
 yanzhenma_URL_f = 'http://guahao.zjol.com.cn/ashx/getyzm.aspx?k=7173&t=yy&hyid=%s'
@@ -80,25 +80,25 @@ def http_gzip(data):
 def get_cookies():
 	return '; '.join(['%s=%s' % x for x in cookieDict.items()])
 
-def ocr_scan(filename, allnum = False, delA = False):
-	img = Image.open(filename)
-	if delA:
-		r, g, b, a = img.split()
-		img = Image.merge("RGB", (r, g, b))
-	# newname = '_%f.bmp' % random.random() * 100000000
-	# img.save(newname)
+# def ocr_scan(filename, allnum = False, delA = False):
+# 	img = Image.open(filename)
+# 	if delA:
+# 		r, g, b, a = img.split()
+# 		img = Image.merge("RGB", (r, g, b))
+# 	# newname = '_%f.bmp' % random.random() * 100000000
+# 	# img.save(newname)
 
-	code = image_to_string(img).strip()
-	clist = []
-	for i in code:
-		if allnum:
-			if i.isdigit():
-				clist.append(i)
-		else:
-			if i.isalnum():
-				clist.append(i)
-	print '[OCR DEBUG]', code
-	return ''.join(clist)
+# 	code = image_to_string(img).strip()
+# 	clist = []
+# 	for i in code:
+# 		if allnum:
+# 			if i.isdigit():
+# 				clist.append(i)
+# 		else:
+# 			if i.isalnum():
+# 				clist.append(i)
+# 	print '[OCR DEBUG]', code
+# 	return ''.join(clist)
 
 def is_valid_login_yzm(code):
 	return len(code) == 4 and all([x.isdigit() for x in code])
@@ -134,7 +134,7 @@ def step_0(usr, pwd):
 
 		if not autoOCR:
 			while True:
-				dlg = msgbox.InputBox(title ='登录', imgfile = loginyzm_filename, msg = '登录验证码\n自动OCR识别为%s\n确认直接回车，否则手动输入' % ocr_code)
+				dlg = msgbox.InputBox(title ='登录', imgfile = loginyzm_filename, msg = '登录验证码\n')
 				dlg.mainloop()
 				yzm = dlg.code
 				del dlg
