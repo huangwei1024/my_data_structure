@@ -4,7 +4,6 @@
 
 import urllib
 import urllib2 
-import httplib
 import cookielib
 import zlib
 import StringIO
@@ -13,7 +12,7 @@ import re
 import os
 import time
 import random
-from PIL import Image
+
 
 import msgbox
 
@@ -104,6 +103,8 @@ def is_valid_login_yzm(code):
 	return len(code) == 4 and all([x.isdigit() for x in code])
 
 def step_0(usr, pwd):
+	global httpClient
+
 	# get cookie, ASP.NET_SessionId
 	cj = cookielib.CookieJar()
 	opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj), urllib2.HTTPHandler())
@@ -132,9 +133,20 @@ def step_0(usr, pwd):
 		fp.close()
 
 
+		ocr_code = ''
+		# ocr_code = ocr_scan(loginyzm_filename, allnum = True)
+		# print u'自动OCR识别验证码为', ocr_code
+		# yzm = ocr_code
+		if not is_valid_login_yzm(ocr_code):
+			ocr_code = ''
+
 		if not autoOCR:
 			while True:
-				dlg = msgbox.InputBox(title ='登录', imgfile = loginyzm_filename, msg = '登录验证码\n')
+				if len(ocr_code) > 0:
+					msg = '登录验证码\n自动OCR识别为%s\n确认直接回车，否则手动输入' % ocr_code
+				else:
+					msg = '登录验证码\n'
+				dlg = msgbox.InputBox(title ='登录', imgfile = loginyzm_filename, msg = msg)
 				dlg.mainloop()
 				yzm = dlg.code
 				del dlg
@@ -173,6 +185,7 @@ def step_0(usr, pwd):
 
 def step_1():
 	global sgList
+	global httpClient
 
 	if len(sgList) > 0:
 		return sgList[0]
@@ -190,6 +203,20 @@ def step_1():
 	data = response.read()
 	if encoding == 'gzip':
 		data = http_gzip(data)
+
+	# find doctor
+	if len(doctorname_Choice) > 0:
+		reg = r'<td height="45px"><a href="DoctorInfo\.Aspx[^<]*<b class="red12">(?P<name>%s)</b>(?P<yy>.*?)</tr>' % doctorname_Choice
+		result = ""
+		match = re.search(reg, data, re.DOTALL)
+		if match:
+			result = match.group("yy")
+		if len(result) != 0:
+			data = result
+		else:
+			print u'没有指定医生 %s!' % utf2uni(doctorname_Choice)
+			return None
+
 	sgList = re.findall(r"javascript:showDiv\('(?P<sg>[^']*)'\)", data)
 	if len(sgList) == 0:
 		print u'没有可预约的!'
@@ -199,6 +226,7 @@ def step_1():
 def check():
 	global sgList
 	global yzm_filename
+	global httpClient
 
 	try:
 		sg = step_1()
@@ -267,6 +295,10 @@ def check():
 			fp.write(data)
 			fp.close()
 
+			# ocr_code = ocr_scan(yzm_filename, delA = True)
+			# print u'自动OCR识别验证码为', ocr_code
+			# yzm = ocr_code
+
 			# yzm = raw_input('input %s code (empty use OCR):' % yzm_filename)
 
 			msg = '\n'.join([patient, hospital, office, doctor, date]) + '\n'
@@ -310,10 +342,15 @@ def check():
 		# print response.getheaders()
 		# print response.read()
 
+	except httplib.CannotSendRequest, e:
+		print e
+		httpClient.close()
+		print u'重连服务器'
+		httpClient = httplib.HTTPConnection("guahao.zjol.com.cn", 80)
 	except Exception:
 		import traceback
 		traceback.print_exc()
-		print 'httpClient sock',httpClient.sock
+		print 'httpClient sock',httpClient.sock,httpClient.sock.getpeername()
 		return False
 
 import argparse
@@ -321,9 +358,9 @@ import argparse
 def parseArgs():
 	parser = argparse.ArgumentParser(description=utf2gbk("省妇保挂号程序"),\
 		formatter_class=argparse.RawDescriptionHelpFormatter)
-	parser.add_argument('ks', type=int, help=utf2gbk(''.join(['%d.%s' % (x[0],x[1][1]) for x in zip([i for i in xrange(len(cks))], cks)])))
-	parser.add_argument('-n', type=int, default=10, help=utf2gbk('尝试次数，0表示无限尝试，默认10次'))
-	parser.add_argument('-d', '--docname', type=str, default=None, help=utf2gbk('指定医生名字'))
+	parser.add_argument('-ks', type=int, default=0, help=utf2gbk(''.join(['%d.%s' % (x[0],x[1][1]) for x in zip([i for i in xrange(len(cks))], cks)])))
+	parser.add_argument('-n', type=int, default=0, help=utf2gbk('尝试次数，0表示无限尝试，默认10次'))
+	parser.add_argument('-d', '--docname', type=str, default='', help=utf2gbk('指定医生名字'))
 	args = parser.parse_args()
 	return args
 
