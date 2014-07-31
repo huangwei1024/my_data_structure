@@ -4,6 +4,7 @@
 
 import urllib
 import urllib2 
+import httplib
 import cookielib
 import zlib
 import StringIO
@@ -12,14 +13,16 @@ import re
 import os
 import time
 import random
-
+import datetime
 
 import msgbox
+import debuglog
 
-
-utf2gbk = lambda x: x.decode('utf8').encode('gbk')
-utf2uni = lambda x: x.decode('utf8')
-gbk2utf = lambda x: x.decode('gbk').encode('utf8')
+nowtime = lambda : str(datetime.datetime.now())
+utf2uni = utf2gbk = gbk2utf = lambda x: x
+# utf2gbk = lambda x: x.decode('utf8').encode('gbk')
+# utf2uni = lambda x: x.decode('utf8')
+# gbk2utf = lambda x: x.decode('gbk').encode('utf8')
 rndistr = lambda : str(random.randint(1000000000, 9999999999))
 
 # 浙江大学医学院附属妇产科医院 --【普通产科】
@@ -133,35 +136,19 @@ def step_0(usr, pwd):
 		fp.close()
 
 
-		ocr_code = ''
-		# ocr_code = ocr_scan(loginyzm_filename, allnum = True)
-		# print u'自动OCR识别验证码为', ocr_code
-		# yzm = ocr_code
-		if not is_valid_login_yzm(ocr_code):
-			ocr_code = ''
+		while True:
+			msg = '登录验证码\n'
+			dlg = msgbox.InputBox(title ='登录', imgfile = loginyzm_filename, msg = msg)
+			dlg.mainloop()
+			yzm = dlg.code
+			del dlg
 
-		if not autoOCR:
-			while True:
-				if len(ocr_code) > 0:
-					msg = '登录验证码\n自动OCR识别为%s\n确认直接回车，否则手动输入' % ocr_code
-				else:
-					msg = '登录验证码\n'
-				dlg = msgbox.InputBox(title ='登录', imgfile = loginyzm_filename, msg = msg)
-				dlg.mainloop()
-				yzm = dlg.code
-				del dlg
-
-				if len(yzm) == 0:
-					yzm = ocr_code
-
-				print u'账户登录验证码输入为', yzm
-				if not is_valid_login_yzm(yzm):
-					print u'验证码应该是4位数字，请检查'
-					continue
-				break
-		else:
+			print '账户登录验证码输入为', yzm
 			if not is_valid_login_yzm(yzm):
+				print '验证码应该是4位数字，请检查'
 				continue
+			break
+		
 
 		# login
 		login_URL = login_URL_f % (usr, pwd, yzm)
@@ -214,12 +201,12 @@ def step_1():
 		if len(result) != 0:
 			data = result
 		else:
-			print u'没有指定医生 %s!' % utf2uni(doctorname_Choice)
+			print '没有指定医生 %s!' % utf2uni(doctorname_Choice)
 			return None
 
 	sgList = re.findall(r"javascript:showDiv\('(?P<sg>[^']*)'\)", data)
 	if len(sgList) == 0:
-		print u'没有可预约的!'
+		print '没有可预约的!'
 		return None
 	return sgList[0]
 
@@ -263,8 +250,8 @@ def check():
 		mgenc = dlist[12]
 		orders = dlist[11].split('$')[1:]
 
-		print u' '.join([utf2uni(x) for x in [patient, hospital, office, doctor, date]])
-		print u'一共有',len(orders),u'个号子'
+		print ' '.join([utf2uni(x) for x in [patient, hospital, office, doctor, date]])
+		print '一共有',len(orders), '个号子'
 
 		if len(orders) == 0:
 			sgList = sgList[1:] # 下个预约日
@@ -277,7 +264,7 @@ def check():
 
 			# step 3
 			hyid, number, time, flag = order.split('|')
-			print number, u'号 /', time[:2], ':', time[2:], hyid
+			print number, '号 /', time[:2], ':', time[2:], hyid
 			yanzhenma_URL = yanzhenma_URL_f % hyid
 
 			httpClient.request("GET", yanzhenma_URL, headers=headers)
@@ -295,10 +282,6 @@ def check():
 			fp.write(data)
 			fp.close()
 
-			# ocr_code = ocr_scan(yzm_filename, delA = True)
-			# print u'自动OCR识别验证码为', ocr_code
-			# yzm = ocr_code
-
 			# yzm = raw_input('input %s code (empty use OCR):' % yzm_filename)
 
 			msg = '\n'.join([patient, hospital, office, doctor, date]) + '\n'
@@ -311,8 +294,8 @@ def check():
 			del dlg
 
 			if len(yzm) == 0:
-				yzm = 'xxxxx' # ocr_code
-			print u'验证码输入为', yzm
+				yzm = 'xxxxx'
+			print '验证码输入为', yzm
 
 			lgcfas = hyid
 			xh = number
@@ -345,7 +328,7 @@ def check():
 	except httplib.CannotSendRequest, e:
 		print e
 		httpClient.close()
-		print u'重连服务器'
+		print '重连服务器'
 		httpClient = httplib.HTTPConnection("guahao.zjol.com.cn", 80)
 	except Exception:
 		import traceback
@@ -367,7 +350,7 @@ def parseArgs():
 if __name__ == '__main__':
 	args = parseArgs()
 	print args
-
+	
 	chanke_Choice = args.ks
 	chanke_Referer, chanke_Name = cks[args.ks]
 	yzm_filename = str(time.time() + random.random() * 100000000) + '.png'
@@ -376,17 +359,17 @@ if __name__ == '__main__':
 	
 	login_ok = step_0('341822200510110021', '20051011')
 	if not login_ok:
-		print u'登录不成功，请重试'
+		print '登录不成功，请重试'
 	else:
-		print u'开始刷号子', utf2uni(chanke_Name)
+		print '开始刷号子', utf2uni(chanke_Name)
 
 		errcnt = 0
 		errmax = args.n
 		while True:
 			print '-'*50
-			print time.time(), u'第%d次尝试%s...' % (errcnt, utf2uni(chanke_Name))
+			print nowtime(), '第%d次尝试%s...' % (errcnt, utf2uni(chanke_Name))
 			if check():
-				print u'!!!!成功预约%s!!!!' % utf2uni(chanke_Name)
+				print '!!!!成功预约%s!!!!' % utf2uni(chanke_Name)
 				dlg = msgbox.MsgBox('成功预约', '成功预约\n' + chanke_Name)
 				dlg.mainloop()
 				del dlg
