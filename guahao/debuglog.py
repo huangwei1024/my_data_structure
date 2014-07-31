@@ -3,6 +3,7 @@
 
 from datetime import datetime
 import sys
+import platform
 
 reload(sys)
 sys.setdefaultencoding('utf-8')
@@ -26,7 +27,10 @@ class DebugLog(object):
 
 	def write(self, stream):
 		if self.console:
-			self.sys_out.write(stream)
+			if platform.system() == 'Windows':
+				self.sys_out.write(stream.decode('utf8').encode('gbk'))
+			else:
+				self.sys_out.write(stream)
 		if self.logfile:
 			self.logfile.write(stream)
 

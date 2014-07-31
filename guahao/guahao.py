@@ -19,10 +19,6 @@ import msgbox
 import debuglog
 
 nowtime = lambda : str(datetime.datetime.now())
-utf2uni = utf2gbk = gbk2utf = lambda x: x
-# utf2gbk = lambda x: x.decode('utf8').encode('gbk')
-# utf2uni = lambda x: x.decode('utf8')
-# gbk2utf = lambda x: x.decode('gbk').encode('utf8')
 rndistr = lambda : str(random.randint(1000000000, 9999999999))
 
 # 浙江大学医学院附属妇产科医院 --【普通产科】
@@ -41,6 +37,8 @@ cks = [ck1, ck2, ck3, yk, ck_test]
 chanke_Referer, chanke_Name = cks[0]
 chanke_Choice = 0
 doctorname_Choice = ''
+user_info = {}
+user_qh_cnt = 0
 
 yzm_filename = 'yyzm.png'
 loginyzm_filename = 'yzm.png'
@@ -166,7 +164,7 @@ def step_0(usr, pwd):
 			headers['Cookie'] = get_cookies()
 			return True
 		else:
-			print utf2gbk(data)
+			print data
 
 	return False
 
@@ -201,7 +199,7 @@ def step_1():
 		if len(result) != 0:
 			data = result
 		else:
-			print '没有指定医生 %s!' % utf2uni(doctorname_Choice)
+			print '没有指定医生 %s!' % doctorname_Choice
 			return None
 
 	sgList = re.findall(r"javascript:showDiv\('(?P<sg>[^']*)'\)", data)
@@ -214,6 +212,8 @@ def check():
 	global sgList
 	global yzm_filename
 	global httpClient
+	global user_info
+	global user_qh_cnt
 
 	try:
 		sg = step_1()
@@ -250,7 +250,7 @@ def check():
 		mgenc = dlist[12]
 		orders = dlist[11].split('$')[1:]
 
-		print ' '.join([utf2uni(x) for x in [patient, hospital, office, doctor, date]])
+		print ' '.join([patient, hospital, office, doctor, date])
 		print '一共有',len(orders), '个号子'
 
 		if len(orders) == 0:
@@ -258,9 +258,22 @@ def check():
 			return False
 		
 		if True:
-			order = orders[0] # 第一个号子
-			if len(orders) > 1:
-				order = orders[1]
+			cur_choose = 1
+			if len(user_info['qh_shunxu']) > 0:
+				for i in xrange(len(user_info['qh_shunxu'])):
+					cur_choose = user_info['qh_shunxu'][(i + user_qh_cnt) % len(user_info['qh_shunxu'])] -1
+					if cur_choose < len(orders):
+						user_qh_cnt += i + 1
+						break
+
+			if cur_choose < len(orders):
+				order = orders[cur_choose]
+			else:
+				cur_choose = 0
+				order = orders[0] # 第一个号子
+				if len(orders) > 1:
+					cur_choose = 1
+					order = orders[1]
 
 			# step 3
 			hyid, number, time, flag = order.split('|')
@@ -286,7 +299,7 @@ def check():
 
 			msg = '\n'.join([patient, hospital, office, doctor, date]) + '\n'
 			msg += '-'*20 + '\n'
-			msg += '一共有' + str(len(orders)) + '个号子\n'
+			msg += '一共有%d个号子\n选择了第%d个\n' % (len(orders), cur_choose + 1)
 			msg += ''.join([number, '号/', time[:2], ':', time[2:]])
 			dlg = msgbox.InputBox(title ='预约', imgfile = yzm_filename, msg = msg)
 			dlg.mainloop()
@@ -313,7 +326,7 @@ def check():
 				return False
 
 			data = response.read()
-			print utf2uni(data)
+			print data
 			rlst = data.split('|')
 			if len(rlst) == 0 or rlst[0] == 'ERROR':
 				# print response.getheaders()
@@ -339,37 +352,45 @@ def check():
 import argparse
 
 def parseArgs():
-	parser = argparse.ArgumentParser(description=utf2gbk("省妇保挂号程序"),\
+	parser = argparse.ArgumentParser(description="省妇保挂号程序",\
 		formatter_class=argparse.RawDescriptionHelpFormatter)
-	parser.add_argument('-ks', type=int, default=0, help=utf2gbk(''.join(['%d.%s' % (x[0],x[1][1]) for x in zip([i for i in xrange(len(cks))], cks)])))
-	parser.add_argument('-n', type=int, default=0, help=utf2gbk('尝试次数，0表示无限尝试，默认10次'))
-	parser.add_argument('-d', '--docname', type=str, default='', help=utf2gbk('指定医生名字'))
+	parser.add_argument('-ks', type=int, default=0, help=''.join(['%d.%s' % (x[0],x[1][1]) for x in zip([i for i in xrange(len(cks))], cks)]))
+	parser.add_argument('-n', type=int, default=0, help='尝试次数，0表示无限尝试，默认10次')
+	parser.add_argument('-d', '--docname', type=str, default='', help='指定医生名字')
 	args = parser.parse_args()
 	return args
 
 if __name__ == '__main__':
 	args = parseArgs()
 	print args
-	
+
 	chanke_Choice = args.ks
 	chanke_Referer, chanke_Name = cks[args.ks]
 	yzm_filename = str(time.time() + random.random() * 100000000) + '.png'
 	if args.docname:
 		doctorname_Choice = args.docname
+
+	while len(user_info) == 0:
+		dlg = msgbox.SelectBox()
+		dlg.mainloop()
+		user_info = dlg.userInfo
+		del dlg
+	print '选择了用户', user_info['name']
+	print user_info['yiyuan'], user_info['keshi'], user_info['yishen']
 	
-	login_ok = step_0('341822200510110021', '20051011')
+	login_ok = step_0(user_info['id'], user_info['password'])
 	if not login_ok:
 		print '登录不成功，请重试'
 	else:
-		print '开始刷号子', utf2uni(chanke_Name)
+		print '开始刷号子', chanke_Name
 
 		errcnt = 0
 		errmax = args.n
 		while True:
 			print '-'*50
-			print nowtime(), '第%d次尝试%s...' % (errcnt, utf2uni(chanke_Name))
+			print nowtime(), '第%d次尝试%s...' % (errcnt, chanke_Name)
 			if check():
-				print '!!!!成功预约%s!!!!' % utf2uni(chanke_Name)
+				print '!!!!成功预约%s!!!!' % chanke_Name
 				dlg = msgbox.MsgBox('成功预约', '成功预约\n' + chanke_Name)
 				dlg.mainloop()
 				del dlg
