@@ -14,12 +14,15 @@ import os
 import time
 import random
 import datetime
+import multiprocessing
 
 import msgbox
 import debuglog
 
 nowtime = lambda : str(datetime.datetime.now())
 rndistr = lambda : str(random.randint(1000000000, 9999999999))
+
+# http://guahao.zjol.com.cn/update/Area.xml
 
 # 浙江大学医学院附属妇产科医院 --【普通产科】
 ck1 = ('http://guahao.zjol.com.cn/DepartMent.Aspx?ID=9294', '【普通产科】')
@@ -28,7 +31,7 @@ ck2 = ('http://guahao.zjol.com.cn/DepartMent.Aspx?ID=9272', '【产科名医】'
 # 浙江大学医学院附属妇产科医院 --【产科专家】
 ck3 = ('http://guahao.zjol.com.cn/DepartMent.Aspx?ID=9273', '【产科专家】')
 # 测试科室
-ck_test = ('http://guahao.zjol.com.cn/DepartMent.Aspx?ID=197', '测试科室')
+ck_test = ('http://guahao.zjol.com.cn/DepartMent.Aspx?ID=9137', '测试科室')
 
 # 浙江大学医学院附属第二医院 --【眼科名医门诊】孙朝晖 
 yk = ('http://guahao.zjol.com.cn/DepartMent.Aspx?ID=10102', '【眼科名医门诊】')
@@ -42,7 +45,7 @@ user_qh_cnt = 0
 
 yzm_filename = 'yyzm.png'
 loginyzm_filename = 'yzm.png'
-
+yzm_filename_f = 'hyid%s.png'
 
 yanzhenma_URL_f = 'http://guahao.zjol.com.cn/ashx/getyzm.aspx?k=7173&t=yy&hyid=%s'
 login_URL_f = 'http://guahao.zjol.com.cn/ashx/LoginDefault.ashx?idcode=%s&pwd=%s&txtVerifyCode=%s'
@@ -61,23 +64,18 @@ sgList = []
 cookieDict = {'pgv_pvi': rndistr(), 
 				'pgv_si': rndistr(),
 				'BAIDU_DUP_lcr': 'https://www.google.com.hk/',
-				# 'Hm_lvt_e480108ab2cee67da5ec65023fd1b941': ','.join([rndistr() for i in xrange(3)]), 
-				# 'Hm_lpvt_e480108ab2cee67da5ec65023fd1b941': rndistr(),
-				# 'Hm_lvt_419cfa1cc17e2e1dc6d4f431f8d19872': ','.join([rndistr() for i in xrange(4)]), 
-				# 'Hm_lpvt_419cfa1cc17e2e1dc6d4f431f8d19872': rndistr(),
 				'CNZZDATA30020775': 'cnzz_eid%3D833334187-1405072273-null%26ntime%3D' + rndistr(),
 }
 httpClient = httplib.HTTPConnection("guahao.zjol.com.cn", 80)
-autoOCR = False
-
-
+yzmProcess = None
+yyQueue = multiprocessing.Queue()
 
 def http_gzip(data):
 	compressedstream = StringIO.StringIO(data)
 	gzipper = gzip.GzipFile(fileobj=compressedstream)
 	return gzipper.read()
 
-def get_cookies():
+def make_cookies(cookieDict):
 	return '; '.join(['%s=%s' % x for x in cookieDict.items()])
 
 # def ocr_scan(filename, allnum = False, delA = False):
@@ -117,7 +115,7 @@ def step_0(usr, pwd):
 		
 	for i in xrange(10):
 		# get login yzm png
-		headers['Cookie'] = get_cookies()
+		headers['Cookie'] = make_cookies(cookieDict)
 		httpClient.request("GET", '/VerifyCodeCH.aspx', headers=headers)
 		response = httpClient.getresponse()
 		if response.status != 200:
@@ -161,7 +159,7 @@ def step_0(usr, pwd):
 
 		if len(dlist) == 2:
 			cookieDict['UserId'] = dlist[1]
-			headers['Cookie'] = get_cookies()
+			headers['Cookie'] = make_cookies(cookieDict)
 			return True
 		else:
 			print data
@@ -257,28 +255,28 @@ def check():
 			sgList = sgList[1:] # 下个预约日
 			return False
 		
-		if True:
-			cur_choose = 1
-			if len(user_info['qh_shunxu']) > 0:
-				for i in xrange(len(user_info['qh_shunxu'])):
-					cur_choose = user_info['qh_shunxu'][(i + user_qh_cnt) % len(user_info['qh_shunxu'])] -1
-					if cur_choose < len(orders):
-						user_qh_cnt += i + 1
-						break
+		# 读顺序配置
+		cur_choose = 1
+		if len(user_info['qh_shunxu']) > 0:
+			for i in xrange(len(user_info['qh_shunxu'])):
+				cur_choose = user_info['qh_shunxu'][(i + user_qh_cnt) % len(user_info['qh_shunxu'])] -1
+				if cur_choose < len(orders):
+					user_qh_cnt += i + 1
+					break
 
-			if cur_choose < len(orders):
-				order = orders[cur_choose]
-			else:
+		for i in xrange(3):
+			cur_choose += i
+			if cur_choose >= len(orders):
 				cur_choose = 0
-				order = orders[0] # 第一个号子
 				if len(orders) > 1:
 					cur_choose = 1
-					order = orders[1]
+			order = orders[cur_choose]
 
 			# step 3
 			hyid, number, time, flag = order.split('|')
 			print number, '号 /', time[:2], ':', time[2:], hyid
 			yanzhenma_URL = yanzhenma_URL_f % hyid
+			yzm_filename = yzm_filename_f % hyid
 
 			httpClient.request("GET", yanzhenma_URL, headers=headers)
 			response = httpClient.getresponse()
@@ -334,9 +332,6 @@ def check():
 
 		return True
 
-		# print response.status, response.reason
-		# print response.getheaders()
-		# print response.read()
 
 	except httplib.CannotSendRequest, e:
 		print e
@@ -354,7 +349,7 @@ import argparse
 def parseArgs():
 	parser = argparse.ArgumentParser(description="省妇保挂号程序",\
 		formatter_class=argparse.RawDescriptionHelpFormatter)
-	parser.add_argument('-ks', type=int, default=0, help=''.join(['%d.%s' % (x[0],x[1][1]) for x in zip([i for i in xrange(len(cks))], cks)]))
+	parser.add_argument('-ks', type=int, default=4, help=''.join(['%d.%s' % (x[0],x[1][1]) for x in zip([i for i in xrange(len(cks))], cks)]))
 	parser.add_argument('-n', type=int, default=0, help='尝试次数，0表示无限尝试，默认10次')
 	parser.add_argument('-d', '--docname', type=str, default='', help='指定医生名字')
 	args = parser.parse_args()
@@ -370,15 +365,16 @@ if __name__ == '__main__':
 	if args.docname:
 		doctorname_Choice = args.docname
 
-	while len(user_info) == 0:
-		dlg = msgbox.SelectBox()
-		dlg.mainloop()
-		user_info = dlg.userInfo
-		del dlg
-	print '选择了用户', user_info['name']
-	print user_info['yiyuan'], user_info['keshi'], user_info['yishen']
+	# while len(user_info) == 0:
+	# 	dlg = msgbox.SelectBox()
+	# 	dlg.mainloop()
+	# 	user_info = dlg.userInfo
+	# 	del dlg
+	# print '选择了用户', user_info['name']
+	# print user_info['yiyuan'], user_info['keshi'], user_info['yishen']
 	
-	login_ok = step_0(user_info['id'], user_info['password'])
+	# login_ok = step_0(user_info['id'], user_info['password'])
+	login_ok = step_0('33100319861024003X', 'huangwei')
 	if not login_ok:
 		print '登录不成功，请重试'
 	else:
