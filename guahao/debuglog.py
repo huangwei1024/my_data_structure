@@ -34,4 +34,12 @@ class DebugLog(object):
 		if self.logfile:
 			self.logfile.write(stream)
 
+	def flush(self):
+		if self.console:
+			self.sys_out.flush()
+		if self.logfile:
+			self.logfile.flush()
+
 DebugLog('guahao', True)
+
+
