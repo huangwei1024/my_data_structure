@@ -68,11 +68,22 @@ cookieDict = {'pgv_pvi': rndistr(),
 				'BAIDU_DUP_lcr': 'https://www.google.com.hk/',
 				'CNZZDATA30020775': 'cnzz_eid%3D833334187-1405072273-null%26ntime%3D' + rndistr(),
 }
-httpClient = httplib.HTTPConnection("guahao.zjol.com.cn", 80)
 yyProcess = None
-yyQueue = multiprocessing.Queue(100)
-yyEvent  = multiprocessing.Event()
+# yyQueue = multiprocessing.Queue(100)
+yyManager = None
+yyQueue = None
+yyEvent = None
 
+
+timeperf = {}
+def begin_perf(name):
+	global timeperf
+	timeperf[name] = time.time()
+
+def end_perf(name):
+	global timeperf
+	elapse = time.time() - timeperf[name]
+	print '[DEBUG]', name, 'cost', elapse
 
 def http_gzip(data):
 	compressedstream = StringIO.StringIO(data)
@@ -85,47 +96,33 @@ def make_cookies(cookieDict):
 def is_valid_login_yzm(code):
 	return len(code) == 4 and all([x.isdigit() for x in code])
 
-import Queue
 def put_que(dlist, ev, que):
-	try:
-		dlist = dlist
-		que.put_nowait(dlist)
-	except Queue.Full:
-		# print 'put_que is FULL', ttt
-		ev.clear()
-		while not que.empty():
-			que.get()
-		que.put(dlist)
-		ev.set()
+	# time.sleep(1)
+	que[:] = dlist
+	# print '!!put_que', type(que)
+	# print que
 
 def get_que(ev, que):
-	ev.wait()
-	ret = que.get()
-	empty = False
-	while not empty:
-		try:
-			ret = que.get_nowait()
-		except Queue.Empty:
-			empty = True
-	# print 'get_que', ret[0]
-	return ret
+	# print '!!get_que', type(que)
+	# print que
+	# time.sleep(1)
+	return que
 
 def refresh_yy(ev, que, headers):
 	global sgList
 
-	httpClient = httplib.HTTPConnection("guahao.zjol.com.cn", 80)
+	httpRefresh = httplib.HTTPConnection("guahao.zjol.com.cn", 80)
 
 	while True:
 		try:
-			sg = step_1(httpClient, headers)
+			sg = step_1(httpRefresh, headers)
 			if sg is None:
-				time.sleep(1)
 				continue
 
 			# step 2
 			body = urllib.urlencode({'sg': sg})
-			httpClient.request("POST", "/ashx/gethy.ashx", body, headers)
-			response = httpClient.getresponse()
+			httpRefresh.request("POST", "/ashx/gethy.ashx", body, headers)
+			response = httpRefresh.getresponse()
 			data = response.read()
 
 			if response.status != 200:
@@ -141,17 +138,19 @@ def refresh_yy(ev, que, headers):
 			if len(orders) == 0:
 				sgList = sgList[1:] # 下个预约日
 			else:
+				# begin_perf('put_que')
 				put_que(dlist, ev, que)
+				# end_perf('put_que')
+				time.sleep(1)
 
 		except Exception:
 			traceback.print_exc()
-			httpClient.close()
+			httpRefresh.close()
 			print '[refresh_yy] 重连服务器'
-			httpClient = httplib.HTTPConnection("guahao.zjol.com.cn", 80)
+			httpRefresh = httplib.HTTPConnection("guahao.zjol.com.cn", 80)
 
 
-def step_0(usr, pwd):
-	global httpClient
+def step_0(httpClient, usr, pwd):
 
 	# get cookie, ASP.NET_SessionId
 	cj = cookielib.CookieJar()
@@ -180,7 +179,6 @@ def step_0(usr, pwd):
 		fp = open(loginyzm_filename, 'wb')
 		fp.write(data)
 		fp.close()
-
 
 		while True:
 			msg = '登录验证码\n'
@@ -223,9 +221,7 @@ def step_1(httpClient, headers):
 		return sgList[0]
 
 	# step 1
-	headers["Referer"] = chanke_Referer
-
-	httpClient.request("GET", chanke_Referer, headers=headers)
+	httpClient.request("GET", headers["Referer"], headers=headers)
 	response = httpClient.getresponse()
 	encoding = response.getheader('Content-Encoding')
 	data = response.read()
@@ -256,16 +252,16 @@ def step_1(httpClient, headers):
 		return None
 	return sgList[0]
 
-def check():
-	global sgList
+def check(httpClient):
 	global yzm_filename
-	global httpClient
 	global user_info
 	global user_qh_cnt
 	global yyQueue
 
 	try:
+		begin_perf('get dlist')
 		dlist = get_que(yyEvent, yyQueue)
+		end_perf('get dlist')
 		if dlist is None or len(dlist) == 0:
 			return False
 
@@ -293,6 +289,8 @@ def check():
 
 		# 一次预取3个号子验证码
 		for i in xrange(3):
+			begin_perf('yuyue total')
+
 			cur_choose += i
 			if cur_choose >= len(orders):
 				cur_choose = random.randint(0, len(orders) - 1)
@@ -305,21 +303,25 @@ def check():
 			yanzhenma_URL = yanzhenma_URL_f % hyid
 			yzm_filename = yzm_filename_f % hyid
 
+			begin_perf('GET yanzhenma_URL')
 			httpClient.request("GET", yanzhenma_URL, headers=headers)
 			response = httpClient.getresponse()
 			encoding = response.getheader('Content-Encoding')
 			data = response.read()
+			end_perf('GET yanzhenma_URL')
 
 			if response.status != 200:
 				print 'step 3. GET yzm error', response.status, response.reason
 				return False
 
+			begin_perf('unzip and io')
 			if encoding == 'gzip':
 				data = http_gzip(data)
 
 			fp = open(yzm_filename, 'wb')
 			fp.write(data)
 			fp.close()
+			begin_perf('unzip and io')
 
 			# yzm = raw_input('input %s code (empty use OCR):' % yzm_filename)
 
@@ -332,8 +334,8 @@ def check():
 			yzm = dlg.code
 			del dlg
 
-			if len(yzm) == 0:
-				yzm = 'xxxxx'
+			if len(yzm) != 5:
+				continue
 			print '验证码输入为', yzm
 
 			lgcfas = hyid
@@ -342,10 +344,14 @@ def check():
 			sg = mgenc
 
 			# step 4.
+			begin_perf('POST /ashx/TreadYuyue.ashx')
 			body = urllib.urlencode({'sg': sg, 'lgcfas':lgcfas, 'yzm':yzm, 'xh':xh, 'qhsj':qhsj})
 			httpClient.request("POST", '/ashx/TreadYuyue.ashx', body, headers)
 			response = httpClient.getresponse()
 			data = response.read()
+			end_perf('POST /ashx/TreadYuyue.ashx')
+
+			end_perf('yuyue total')
 
 			if response.status != 200:
 				print 'step 4. POST TreadYuyue error', response.status, response.reason
@@ -374,7 +380,6 @@ def check():
 		return False
 
 	except Exception:
-		import traceback
 		traceback.print_exc()
 		return False
 
@@ -390,6 +395,11 @@ def parseArgs():
 	return args
 
 if __name__ == '__main__':
+	multiprocessing.freeze_support()
+	yyManager = multiprocessing.Manager()
+	yyQueue = yyManager.list()
+	yyEvent  = multiprocessing.Event()
+
 	args = parseArgs()
 	print args
 
@@ -398,6 +408,9 @@ if __name__ == '__main__':
 	yzm_filename = str(time.time() + random.random() * 100000000) + '.png'
 	if args.docname:
 		doctorname_Choice = args.docname
+	headers["Referer"] = chanke_Referer
+
+	httpClient = httplib.HTTPConnection("guahao.zjol.com.cn", 80)
 
 	# while len(user_info) == 0:
 	# 	dlg = msgbox.SelectBox()
@@ -408,7 +421,7 @@ if __name__ == '__main__':
 	# print user_info['yiyuan'], user_info['keshi'], user_info['yishen']
 	
 	# login_ok = step_0(user_info['id'], user_info['password'])
-	login_ok = step_0('33100319861024003X', 'huangwei')
+	login_ok = step_0(httpClient, '33100319861024003X', 'huangwei')
 	if not login_ok:
 		print '登录不成功，请重试'
 	else:
@@ -423,7 +436,7 @@ if __name__ == '__main__':
 		while True:
 			print '-'*50
 			print nowtime(), '第%d次尝试%s...' % (errcnt, chanke_Name)
-			if check():
+			if check(httpClient):
 				print '!!!!成功预约%s!!!!' % chanke_Name
 				dlg = msgbox.MsgBox('成功预约', '成功预约\n' + chanke_Name)
 				dlg.mainloop()
