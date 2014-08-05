@@ -1,0 +1,20 @@
+{
+	"folders":
+	[
+		{
+			"path": "./",
+			"folder_exclude_patterns" :
+			[
+				"build",
+				"dist",
+				"logs"
+			],
+			"file_exclude_patterns" :
+			[
+				"*.png",
+				"*.ico",
+				"*.log"
+			]
+		}
+	]
+}

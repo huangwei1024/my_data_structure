@@ -9,6 +9,10 @@ import os
 reload(sys)
 sys.setdefaultencoding('utf-8')
 
+def utf2local(s):
+	if platform.system() == 'Windows':
+		return s.decode('utf8').encode('gbk')
+	return s
 
 class DebugLog(object):
 	def __init__(self, filename = None, console = True):
@@ -30,9 +34,11 @@ class DebugLog(object):
 	def write(self, stream):
 		if self.console:
 			if platform.system() == 'Windows':
-				self.sys_out.write(stream.decode('utf8').encode('gbk'))
-			else:
-				self.sys_out.write(stream)
+				try:
+					stream = utf2local(stream)
+				except Exception:
+					pass
+			self.sys_out.write(stream)
 		if self.logfile:
 			self.logfile.write(stream)
 

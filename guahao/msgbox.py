@@ -8,6 +8,31 @@ from PIL import Image, ImageTk
 import json
 
 uni2utf = lambda x: x.encode('utf8')
+def _decode_list(data):
+	rv = []
+	for item in data:
+		if isinstance(item, unicode):
+			item = uni2utf(item)
+		elif isinstance(item, list):
+			item = _decode_list(item)
+		elif isinstance(item, dict):
+			item = _decode_dict(item)
+		rv.append(item)
+	return rv
+
+def _decode_dict(data):
+	rv = {}
+	for key, value in data.iteritems():
+		if isinstance(key, unicode):
+			key = uni2utf(key)
+		if isinstance(value, unicode):
+			value = uni2utf(value)
+		elif isinstance(value, list):
+			value = _decode_list(value)
+		elif isinstance(value, dict):
+			value = _decode_dict(value)
+		rv[key] = value
+	return rv
 
 def pos_center(root):
 	screen_width = root.winfo_screenwidth()
@@ -90,14 +115,14 @@ class SelectBox(tk.Frame):
 		fp = open('user.config', 'r')
 		data = fp.read()
 		fp.close()
-		self.userJs = json.loads(data)['users']
+		self.userJs = json.loads(data, object_hook = _decode_dict)['users']
 		self.userList = []
 		i = 1
 		for u in self.userJs:
 			if 'beizhu' in u:
-				self.userList.append('%d.%s (%s)' % (i, uni2utf(u['name']), u['beizhu']) )
+				self.userList.append('%d.%s (%s)' % (i, u['name'], u['beizhu']) )
 			else:
-				self.userList.append('%d.%s' % (i, uni2utf(u['name'])) )
+				self.userList.append('%d.%s' % (i, u['name']) )
 			i += 1
 
 		self.userComb = ttk.Combobox(self, values = self.userList, font = tkFont.Font(family = 'Arial', size = 16))
@@ -109,14 +134,7 @@ class SelectBox(tk.Frame):
 
 	def select_ok(self):
 		select_index = self.userComb.current()
-		info = self.userJs[select_index]
-
-		for k, v in info.items():
-			if isinstance(k, unicode):
-				k = uni2utf(k)
-			if isinstance(v, unicode):
-				v = uni2utf(v)
-			self.userInfo[k] = v
+		self.userInfo = self.userJs[select_index]
 
 		self.root.quit()
 		self.root.destroy()
