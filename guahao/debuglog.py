@@ -16,14 +16,15 @@ def utf2local(s):
 
 class DebugLog(object):
 	def __init__(self, filename = None, console = True):
-		print self, 'in process', os.getpid(), 'sys.stdout =', type(sys.stdout)
+		# print self, 'in process', os.getpid(), 'sys.stdout =', type(sys.stdout)
 		self.buff = ''
 		self.sys_out = sys.stdout
 		self.sys_err = sys.stderr
 		self.console = console
 		self.logfile = None
 		if filename is not None:
-			self.logfile = open(filename + str(os.getpid()) + '.log', 'a+')
+			# self.logfile = open(filename + str(os.getpid()) + '.log', 'a+')
+			self.logfile = open(filename + '.log', 'a+')
 			self.logfile.write('='*50 + '\n')
 			self.logfile.write(str(datetime.now()) + '\n')
 			self.logfile.write('='*50 + '\n')

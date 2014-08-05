@@ -37,6 +37,8 @@ ck1 = ('http://guahao.zjol.com.cn/DepartMent.Aspx?ID=9294', '普通产科')
 ck2 = ('http://guahao.zjol.com.cn/DepartMent.Aspx?ID=9272', '产科名医')
 # 浙江大学医学院附属妇产科医院 --【产科专家】
 ck3 = ('http://guahao.zjol.com.cn/DepartMent.Aspx?ID=9273', '产科专家')
+# 浙江大学医学院附属妇产科医院 --【产科资深专家】
+ck4 = ('http://guahao.zjol.com.cn/DepartMent.Aspx?ID=10635', '产科资深专家')
 
 # 浙江大学医学院附属第二医院 --【眼科名医门诊】孙朝晖 
 yk = ('http://guahao.zjol.com.cn/DepartMent.Aspx?ID=10102', '眼科名医门诊')
@@ -45,7 +47,7 @@ yk = ('http://guahao.zjol.com.cn/DepartMent.Aspx?ID=10102', '眼科名医门诊'
 ck_test = ('http://guahao.zjol.com.cn/DepartMent.Aspx?ID=9137', '测试科室')
 
 
-cks = [ck1, ck2, ck3, yk, ck_test]
+cks = [ck1, ck2, ck3, ck4, yk, ck_test]
 chanke_Referer, chanke_Name = cks[0]
 chanke_Choice = 0
 doctorname_Choice = ''
@@ -76,12 +78,8 @@ cookieDict = {'pgv_pvi': rndistr(),
 				'BAIDU_DUP_lcr': 'https://www.google.com.hk/',
 				'CNZZDATA30020775': 'cnzz_eid%3D833334187-1405072273-null%26ntime%3D' + rndistr(),
 }
-yyProcess = None
-# yyQueue = multiprocessing.Queue(100)
-yyManager = None
 yyQueue = None
-yyEvent = None
-
+firstQueue = True
 
 timeperf = {}
 def begin_perf(name):
@@ -105,18 +103,6 @@ def make_cookies(cookieDict):
 
 def is_valid_login_yzm(code):
 	return len(code) == 4 and all([x.isdigit() for x in code])
-
-def put_que(val, ev, que):
-	# time.sleep(1)
-	que.put(copy.deepcopy(val))
-	# print '!!put_que', type(que)
-	# print que
-
-def get_que(ev, que):
-	# print '!!get_que', type(que)
-	# print que
-	# time.sleep(1)
-	return que.get()
 
 def refresh_yy(ev, que, headers, httpRefresh = None):
 	global sgList
@@ -159,6 +145,7 @@ def refresh_yy(ev, que, headers, httpRefresh = None):
 			cur_choose = 0
 			while len(orders) > 0:
 				order = orders[0]
+				orders = orders[1:]
 				cur_choose += 1
 				info['cur_choose'] = cur_choose
 
@@ -166,6 +153,9 @@ def refresh_yy(ev, que, headers, httpRefresh = None):
 				yanzhenma_URL = yanzhenma_URL_f % hyid
 				# yzm_filename = yzm_filename_f % hyid
 				yzm_filename = yzm_filename_f % 'yzm'
+				if flag == '1':
+					# 该号被禁止抢
+					continue
 
 				info['number'] = number
 				info['time'] = time
@@ -176,18 +166,6 @@ def refresh_yy(ev, que, headers, httpRefresh = None):
 
 				que.append(copy.deepcopy(info))
 				
-				# 下载验证码
-				# if step_3(httpRefresh, yanzhenma_URL, yzm_filename, headers):
-				# 	cur_choose -= 1
-				# 	continue
-			
-				# print 'put', date, info['time_s'], yzm_filename
-				# begin_perf('put_que')
-				# put_que(info, ev, que)
-				# end_perf('put_que')
-
-				orders = orders[1:]
-
 			sgList = sgList[1:] # 下个预约日
 			# sgList = [] # for debug
 			if len(sgList) == 0:
@@ -303,7 +281,7 @@ def step_1(httpClient, headers):
 
 	# find doctor
 	if len(doctorname_Choice) > 0:
-		reg = r'<td height="45px"><a href="DoctorInfo\.Aspx[^<]*<b class="red12">(?P<name>%s)</b>(?P<yy>.*?)</tr>' % doctorname_Choice
+		reg = r'<td height="45px">.*?<b class="red12">(?P<name>%s)</b>(?P<yy>.*?)</tr>' % doctorname_Choice
 		result = ""
 		match = re.search(reg, data, re.DOTALL)
 		if match:
@@ -356,8 +334,8 @@ def step_3(httpClient, yanzhenma_URL, yzm_filename, headers):
 	fp.close()
 	return True
 
-
 def check(httpClient):
+	global firstQueue
 	global yzm_filename
 	global user_info
 	global user_qh_cnt
@@ -366,7 +344,7 @@ def check(httpClient):
 	while len(yyQueue) > 0:
 		try:
 			# 读顺序配置
-			yy_choose = 1
+			yy_choose = 1 if firstQueue else 0
 			if len(yyQueue) == 1:
 				yy_choose = 0
 			else:
@@ -377,17 +355,15 @@ def check(httpClient):
 							user_qh_cnt += i + 1
 							break
 				else:
-					# 前3个随机
-					yy_choose = random.randint(0, min(2, len(yyQueue) - 1))
+					if len(yyQueue) > 10:
+						# 号子多时前3个随机
+						yy_choose = random.randint(1 if firstQueue else 0, min(2, len(yyQueue) - 1))
 
 			yy_choose = yy_choose % len(yyQueue)
 			info = yyQueue[yy_choose]
 			yyQueue = yyQueue[yy_choose+1:]
+			firstQueue = False
 			# del yyQueue[yy_choose]
-
-			# begin_perf('get info')
-			# info = get_que(yyEvent, yyQueue)
-			# end_perf('get info')
 
 			hospital = info['hospital']
 			office = info['office']
@@ -404,12 +380,12 @@ def check(httpClient):
 			n_orders = info['n_orders']
 
 			print ' '.join([patient, hospital, office, doctor, date])
-			print '一共有%d个号子\n选择了第%d个' % (n_orders, cur_choose)
+			print '一共有%d个号子 选择了第%d个' % (n_orders, cur_choose)
 
 			# 下载验证码
 			yanzhenma_URL = info['yanzhenma_URL']
 			if not step_3(httpClient, yanzhenma_URL, yzm_filename, headers):
-				continue
+				return False
 			
 			# yzm = raw_input('input %s code (empty use OCR):' % yzm_filename)
 
@@ -423,7 +399,7 @@ def check(httpClient):
 			del dlg
 
 			if len(yzm) != 5:
-				continue
+				return False
 			print '验证码输入为', yzm
 
 			lgcfas = hyid
@@ -478,7 +454,6 @@ def parseArgs():
 
 if __name__ == '__main__':
 	multiprocessing.freeze_support()
-	# yyManager = multiprocessing.Manager()
 	yyQueue = multiprocessing.Queue(1000)
 	yyEvent  = multiprocessing.Event()
 
@@ -546,7 +521,8 @@ if __name__ == '__main__':
 				if errmax > 0 and errcnt >= errmax:
 					break
 		finally:
-			print 'finally!!!'
+			print '='*50
+			print '抢号程序结束'
 			# yyProcess.terminate()
 
 
