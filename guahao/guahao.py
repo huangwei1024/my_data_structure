@@ -14,9 +14,7 @@ import time
 import random
 import datetime
 import multiprocessing
-import threading
 import traceback
-import copy
 
 import msgbox
 import debuglog
@@ -80,18 +78,23 @@ cookieDict = {'pgv_pvi': rndistr(),
 }
 yyQueue = None
 firstQueue = True
+httpClient = None
 
-timeperf = {}
-def begin_perf(name):
-	return
-	global timeperf
-	timeperf[name] = time.time()
-
-def end_perf(name):
-	return
-	global timeperf
-	elapse = time.time() - timeperf[name]
-	print '[DEBUG]', name, 'cost', elapse
+class Timer(object):  
+	def __init__(self, name, verbose=True):  
+		self.verbose = verbose  
+		self.name = name
+  
+	def __enter__(self):  
+		self.start = time.time()  
+		return self  
+  
+	def __exit__(self, *args):  
+		self.end = time.time()  
+		self.secs = self.end - self.start  
+		self.msecs = self.secs * 1000  # millisecs  
+		if self.verbose:  
+			print '[DEBUG] %s elapsed time: %f ms' % (self.name, self.msecs)
 
 def http_gzip(data):
 	compressedstream = StringIO.StringIO(data)
@@ -104,23 +107,25 @@ def make_cookies(cookieDict):
 def is_valid_login_yzm(code):
 	return len(code) == 4 and all([x.isdigit() for x in code])
 
-def refresh_yy(ev, que, headers, httpRefresh = None):
+# @profile
+def refresh_yy(que, headers):
 	global sgList
+	global httpClient
 
-	if httpRefresh is None:
-		httpRefresh = httplib.HTTPConnection("guahao.zjol.com.cn", 80)
 	info = {}
 	cur_choose = 0
 
 	while True:
 		try:
-			sg = step_1(httpRefresh, headers)
-			if sg is None:
-				break
+			with Timer('refresh_yy GET sg'):
+				sg = step_1(httpClient, headers)
+				if sg is None:
+					break
 
-			dlist = step_2(httpRefresh, sg, headers)
-			if dlist is None:
-				continue
+			with Timer('refresh_yy GET dlist'):
+				dlist = step_2(httpClient, sg, headers)
+				if dlist is None:
+					continue
 
 			hospital = dlist[1]
 			office = dlist[2]
@@ -143,9 +148,8 @@ def refresh_yy(ev, que, headers, httpRefresh = None):
 			info['n_orders'] = len(orders)
 
 			cur_choose = 0
-			while len(orders) > 0:
-				order = orders[0]
-				orders = orders[1:]
+			while cur_choose < len(orders):
+				order = orders[cur_choose]
 				cur_choose += 1
 				info['cur_choose'] = cur_choose
 
@@ -164,7 +168,7 @@ def refresh_yy(ev, que, headers, httpRefresh = None):
 				info['yzm_filename'] = yzm_filename
 				info['yanzhenma_URL'] = yanzhenma_URL
 
-				que.append(copy.deepcopy(info))
+				que.append(info.copy())
 				
 			sgList = sgList[1:] # 下个预约日
 			# sgList = [] # for debug
@@ -174,9 +178,10 @@ def refresh_yy(ev, que, headers, httpRefresh = None):
 
 		except httplib.CannotSendRequest:
 			traceback.print_exc()
-			httpRefresh.close()
 			print '[refresh_yy] 重连服务器'
-			httpRefresh = httplib.HTTPConnection("guahao.zjol.com.cn", 80)
+			with Timer('refresh_yy re-connect'):
+				httpClient.close()
+				httpClient = httplib.HTTPConnection("guahao.zjol.com.cn", 80)
 			cur_choose -= 1
 			continue
 
@@ -187,9 +192,10 @@ def refresh_yy(ev, que, headers, httpRefresh = None):
 
 		except Exception:
 			traceback.print_exc()
-			httpRefresh.close()
 			print '[refresh_yy] 重连服务器'
-			httpRefresh = httplib.HTTPConnection("guahao.zjol.com.cn", 80)
+			with Timer('refresh_yy re-connect'):
+				httpClient.close()
+				httpClient = httplib.HTTPConnection("guahao.zjol.com.cn", 80)
 			cur_choose -= 1
 			continue
 
@@ -315,12 +321,10 @@ def step_2(httpClient, sg, headers):
 	return dlist
 
 def step_3(httpClient, yanzhenma_URL, yzm_filename, headers):
-	begin_perf('GET yanzhenma_URL')
 	httpClient.request("GET", yanzhenma_URL, headers=headers)
 	response = httpClient.getresponse()
 	encoding = response.getheader('Content-Encoding')
 	data = response.read()
-	end_perf('GET yanzhenma_URL')
 
 	if response.status != 200:
 		print 'step 3. GET yzm error', response.status, response.reason
@@ -334,6 +338,7 @@ def step_3(httpClient, yanzhenma_URL, yzm_filename, headers):
 	fp.close()
 	return True
 
+# @profile
 def check(httpClient):
 	global firstQueue
 	global yzm_filename
@@ -357,13 +362,12 @@ def check(httpClient):
 				else:
 					if len(yyQueue) > 10:
 						# 号子多时前3个随机
-						yy_choose = random.randint(1 if firstQueue else 0, min(2, len(yyQueue) - 1))
+						yy_choose = random.randint(1 if firstQueue else 0, min(1, len(yyQueue) - 1))
 
 			yy_choose = yy_choose % len(yyQueue)
 			info = yyQueue[yy_choose]
 			yyQueue = yyQueue[yy_choose+1:]
 			firstQueue = False
-			# del yyQueue[yy_choose]
 
 			hospital = info['hospital']
 			office = info['office']
@@ -383,9 +387,10 @@ def check(httpClient):
 			print '一共有%d个号子 选择了第%d个' % (n_orders, cur_choose)
 
 			# 下载验证码
-			yanzhenma_URL = info['yanzhenma_URL']
-			if not step_3(httpClient, yanzhenma_URL, yzm_filename, headers):
-				return False
+			with Timer('GET yanzhenma'):
+				yanzhenma_URL = info['yanzhenma_URL']
+				if not step_3(httpClient, yanzhenma_URL, yzm_filename, headers):
+					return False
 			
 			# yzm = raw_input('input %s code (empty use OCR):' % yzm_filename)
 
@@ -399,6 +404,7 @@ def check(httpClient):
 			del dlg
 
 			if len(yzm) != 5:
+				# yzm = 'zzzzz'
 				return False
 			print '验证码输入为', yzm
 
@@ -407,30 +413,30 @@ def check(httpClient):
 			qhsj = time
 			sg = mgenc
 
-			# step 5.
-			begin_perf('POST /ashx/TreadYuyue.ashx')
-			body = urllib.urlencode({'sg':sg, 'lgcfas':lgcfas, 'yzm':yzm, 'xh':xh, 'qhsj':qhsj})
-			httpClient.request("POST", '/ashx/TreadYuyue.ashx', body, headers)
-			response = httpClient.getresponse()
-			data = response.read()
-			end_perf('POST /ashx/TreadYuyue.ashx')
+			# step 4.
+			with Timer('POST TreadYuyue'):
+				body = urllib.urlencode({'sg':sg, 'lgcfas':lgcfas, 'yzm':yzm, 'xh':xh, 'qhsj':qhsj})
+				httpClient.request("POST", '/ashx/TreadYuyue.ashx', body, headers)
+				response = httpClient.getresponse()
+				data = response.read()
 
-			print data
-			if response.status != 200:
-				print 'step 5. POST TreadYuyue error', response.status, response.reason
-				return False
-			
-			rlst = data.split('|')
-			if len(rlst) == 0 or rlst[0] == 'ERROR':
-				return False
+				print data
+				if response.status != 200:
+					print 'step 4. POST TreadYuyue error', response.status, response.reason
+					return False
+				
+				rlst = data.split('|')
+				if len(rlst) == 0 or rlst[0] == 'ERROR':
+					return False
 
 			return True
 
 		except httplib.CannotSendRequest:
 			traceback.print_exc()
-			httpClient.close()
 			print '重连服务器'
-			httpClient = httplib.HTTPConnection("guahao.zjol.com.cn", 80)
+			with Timer('re-connect'):
+				httpClient.close()
+				httpClient = httplib.HTTPConnection("guahao.zjol.com.cn", 80)
 			return False
 
 		except httplib.BadStatusLine:
@@ -439,13 +445,66 @@ def check(httpClient):
 
 		except Exception:
 			traceback.print_exc()
+			print '重连服务器'
+			with Timer('re-connect'):
+				httpClient.close()
+				httpClient = httplib.HTTPConnection("guahao.zjol.com.cn", 80)
 			return False
+
+# @profile
+def main(user, passw):
+	global yyQueue
+	global yyEvent
+	global httpClient
+	global headers
+
+	with Timer('login'):
+		login_ok = step_0(httpClient, user, passw)
+
+	if not login_ok:
+		print '登录不成功，请重试'
+	else:
+		print '开始刷号子', chanke_Name
+
+		# yyProcess = multiprocessing.Process(target=refresh_yy, args=(yyEvent, yyQueue, headers))
+		# yyProcess.start()
+		# yyEvent.set()
+
+		with Timer('refresh_yy'):
+			yyQueue = refresh_yy([], headers)
+
+		try:
+			errcnt = 0
+			errmax = args.n
+			while True:
+				print '-'*50
+				print nowtime(), '第%d次尝试%s...' % (errcnt, chanke_Name)
+
+				with Timer('check'):
+					if check(httpClient):
+						print '!!!!成功预约%s!!!!' % chanke_Name
+						dlg = msgbox.MsgBox('成功预约', '成功预约\n' + chanke_Name)
+						dlg.mainloop()
+						del dlg
+						break
+
+				if len(yyQueue) == 0:
+					with Timer('refresh_yy'):
+						yyQueue = refresh_yy([], headers)
+				# time.sleep(1)
+				errcnt += 1
+				if errmax > 0 and errcnt >= errmax:
+					break
+		finally:
+			print '='*50
+			print '抢号程序结束'
+			# yyProcess.terminate()
 
 import argparse
 def parseArgs():
 	parser = argparse.ArgumentParser(description=utf2local("省妇保挂号程序"),\
 		formatter_class=argparse.RawDescriptionHelpFormatter)
-	parser.add_argument('-ks', type=int, default=4, help=utf2local(''.join(['%d.%s' % (x[0],x[1][1]) for x in zip([i for i in xrange(len(cks))], cks)])))
+	parser.add_argument('-ks', type=int, default=5, help=utf2local(''.join(['%d.%s' % (x[0],x[1][1]) for x in zip([i for i in xrange(len(cks))], cks)])))
 	parser.add_argument('-n', type=int, default=0, help=utf2local('尝试次数，0表示无限尝试'))
 	parser.add_argument('-d', '--docname', type=str, default='', help=utf2local('指定医生名字'))
 	parser.add_argument('-c', '--config', action='store_true', help=utf2local('是否读取配表'))
@@ -453,6 +512,7 @@ def parseArgs():
 	return args
 
 if __name__ == '__main__':
+	random.seed(time.time())
 	multiprocessing.freeze_support()
 	yyQueue = multiprocessing.Queue(1000)
 	yyEvent  = multiprocessing.Event()
@@ -486,43 +546,13 @@ if __name__ == '__main__':
 				break
 		doctorname_Choice = user_info['yishen']
 		
-		login_ok = step_0(httpClient, user_info['id'], user_info['password'])
+		user = user_info['id']
+		passw = user_info['password']
 	else:
-		login_ok = step_0(httpClient, '33100319861024003X', 'huangwei')
+		user = '33100319861024003X'
+		passw = 'huangwei'
 
-	if not login_ok:
-		print '登录不成功，请重试'
-	else:
-		print '开始刷号子', chanke_Name
-
-		# yyProcess = multiprocessing.Process(target=refresh_yy, args=(yyEvent, yyQueue, headers))
-		# yyProcess.start()
-		# yyEvent.set()
-
-		yyQueue = refresh_yy(None, [], headers, httpClient)
-
-		try:
-			errcnt = 0
-			errmax = args.n
-			while True:
-				print '-'*50
-				print nowtime(), '第%d次尝试%s...' % (errcnt, chanke_Name)
-				if check(httpClient):
-					print '!!!!成功预约%s!!!!' % chanke_Name
-					dlg = msgbox.MsgBox('成功预约', '成功预约\n' + chanke_Name)
-					dlg.mainloop()
-					del dlg
-					break
-
-				if len(yyQueue) == 0:
-					yyQueue = refresh_yy(None, [], headers, httpClient)
-				# time.sleep(1)
-				errcnt += 1
-				if errmax > 0 and errcnt >= errmax:
-					break
-		finally:
-			print '='*50
-			print '抢号程序结束'
-			# yyProcess.terminate()
-
+	# import profile
+	# profile.run('main(user, passw)')
+	main(user, passw)
 
