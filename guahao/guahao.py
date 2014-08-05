@@ -215,7 +215,7 @@ def refresh_yy(ev, que, headers, httpRefresh = None):
 			cur_choose -= 1
 			continue
 
-	print 'refresh_yy ok', len(que)
+	print '[refresh_yy] OK', len(que)
 	return que
 
 def step_0(httpClient, usr, pwd):
@@ -380,6 +380,7 @@ def check(httpClient):
 					# 前3个随机
 					yy_choose = random.randint(0, min(2, len(yyQueue) - 1))
 
+			yy_choose = yy_choose % len(yyQueue)
 			info = yyQueue[yy_choose]
 			yyQueue = yyQueue[yy_choose+1:]
 			# del yyQueue[yy_choose]
