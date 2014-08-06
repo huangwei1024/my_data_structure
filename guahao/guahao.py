@@ -399,7 +399,8 @@ def check(httpClient):
 			msg += '一共有%d个号子\n选择了第%d个\n' % (n_orders, cur_choose)
 			msg += ''.join([number, '号/', time_s])
 			dlg = msgbox.InputBox(title ='预约', imgfile = yzm_filename, msg = msg)
-			dlg.mainloop()
+			with Timer('your input'):
+				dlg.mainloop()
 			yzm = dlg.code
 			del dlg
 
@@ -507,7 +508,7 @@ def parseArgs():
 	parser.add_argument('-ks', type=int, default=5, help=utf2local(''.join(['%d.%s' % (x[0],x[1][1]) for x in zip([i for i in xrange(len(cks))], cks)])))
 	parser.add_argument('-n', type=int, default=0, help=utf2local('尝试次数，0表示无限尝试'))
 	parser.add_argument('-d', '--docname', type=str, default='', help=utf2local('指定医生名字'))
-	parser.add_argument('-c', '--config', action='store_true', help=utf2local('是否读取配表'))
+	parser.add_argument('-c', '--config', action='store_false', default=True, help=utf2local('是否读取配表'))
 	args = parser.parse_args()
 	return args
 
