@@ -169,12 +169,11 @@ def refresh_yy(que, headers):
 				info['yanzhenma_URL'] = yanzhenma_URL
 
 				que.append(info.copy())
-				
-			sgList = sgList[1:] # 下个预约日
-			# sgList = [] # for debug
-			if len(sgList) == 0:
-				break
-			# time.sleep(1)
+			
+			break # 只取一个预约日
+			# sgList = sgList[1:] # 下个预约日
+			# if len(sgList) == 0:
+			# 	break
 
 		except httplib.CannotSendRequest:
 			traceback.print_exc()
@@ -346,6 +345,9 @@ def check(httpClient):
 	global user_qh_cnt
 	global yyQueue
 
+	with Timer('refresh_yy'):
+		yyQueue = refresh_yy([], headers)
+
 	while len(yyQueue) > 0:
 		try:
 			# 读顺序配置
@@ -467,13 +469,6 @@ def main(user, passw):
 	else:
 		print '开始刷号子', chanke_Name
 
-		# yyProcess = multiprocessing.Process(target=refresh_yy, args=(yyEvent, yyQueue, headers))
-		# yyProcess.start()
-		# yyEvent.set()
-
-		with Timer('refresh_yy'):
-			yyQueue = refresh_yy([], headers)
-
 		try:
 			errcnt = 0
 			errmax = args.n
@@ -488,10 +483,6 @@ def main(user, passw):
 						dlg.mainloop()
 						del dlg
 						break
-
-				if len(yyQueue) == 0:
-					with Timer('refresh_yy'):
-						yyQueue = refresh_yy([], headers)
 				# time.sleep(1)
 				errcnt += 1
 				if errmax > 0 and errcnt >= errmax:
