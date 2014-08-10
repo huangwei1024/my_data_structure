@@ -12,7 +12,8 @@
 			"file_exclude_patterns" :
 			[
 				"*.png",
-				"*.ico"
+				"*.ico",
+				"*.log"
 			]
 		}
 	]
