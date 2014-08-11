@@ -60,8 +60,6 @@ class DebugLog(object):
 		sys.stdout = self
 		sys.stderr = self
 
-		print '!!', self.sys_out
-
 	def write(self, stream):
 		if self.console:
 			if platform.system() == 'Windows':
@@ -79,4 +77,4 @@ class DebugLog(object):
 		if self.logfile:
 			self.logfile.flush()
 
-DebugLog(None, True)
+DebugLog('guahao', True)

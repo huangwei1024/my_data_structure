@@ -16,7 +16,7 @@ import traceback
 
 import msgbox
 import debuglog
-from debuglog import Timer, EventLocker
+from debuglog import Timer, EventLocker, DebugLog
 
 nowtime = lambda : str(datetime.datetime.now())
 rndistr = lambda : str(random.randint(1000000000, 9999999999))
@@ -38,7 +38,7 @@ def make_cookies(cookieDict):
 
 class Agent(multiprocessing.Process):
 	def __init__(self, args):
-		multiprocessing.Process.__init__(self)
+		multiprocessing.Process.__init__(self, args=args)
 		self.event, self.okEvent = args
 
 	def setInfo(self, cookieDict, chanke_Referer, chanke_Name, doctorname_Choice, errmax):
@@ -66,8 +66,6 @@ class Agent(multiprocessing.Process):
 		}
 		self.cookieDict.update(cookieDict)
 		self.headers['Cookie'] = make_cookies(self.cookieDict)
-		# self.event = event
-		# self.okEvent = okEvent
 		self.httpClient = httplib.HTTPConnection("guahao.zjol.com.cn", 80)
 		self.firstQueue = True
 		self.errmax = errmax
@@ -239,6 +237,8 @@ class Agent(multiprocessing.Process):
 			yyQueue = self.refresh_yy()
 
 		if self.event.is_set():
+			import time
+			time.sleep(1)
 			return False
 
 		while len(yyQueue) > 0:
@@ -352,9 +352,7 @@ class Agent(multiprocessing.Process):
 
 	def run(self):
 		print self.pid, 'running...'
-
-		# self.event = event
-		# self.okEvent = okEvent
+		DebugLog('proc', True)
 
 		errcnt = 0
 		while not self.okEvent.is_set():

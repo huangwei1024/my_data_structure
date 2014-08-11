@@ -84,25 +84,30 @@ class InputBox(tk.Frame):
 
 	def input_contents(self, event):
 		self.code = self.contents.get()
-		self.root.quit()
-		self.root.destroy()
+		self._root().quit()
+		self._root().destroy()
 
 	def __init__(self, title = '', imgfile = '', msg = ''):
+		print 'InputBox init'
 		self.root = tk.Tk()
 		tk.Frame.__init__(self, self.root)
+
+		import os
+		print 'InputBox!!!TK', os.getpid(), self._root(), id(self._root()), type(self._root())
+		
 
 		self.imgfile = imgfile
 		self.code = ''
 		self.msg = msg
 
-		self.root.title(title)
-		self.root.resizable(False, False)
+		self._root().title(title)
+		self._root().resizable(False, False)
 
 		self.pack()
 		self.createWidgets()
 		self.input.focus_set()
 
-		pos_center(self.root)
+		pos_center(self._root())
 
 
 
