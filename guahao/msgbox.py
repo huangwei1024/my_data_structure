@@ -88,13 +88,8 @@ class InputBox(tk.Frame):
 		self._root().destroy()
 
 	def __init__(self, title = '', imgfile = '', msg = ''):
-		print 'InputBox init'
 		self.root = tk.Tk()
 		tk.Frame.__init__(self, self.root)
-
-		import os
-		print 'InputBox!!!TK', os.getpid(), self._root(), id(self._root()), type(self._root())
-		
 
 		self.imgfile = imgfile
 		self.code = ''

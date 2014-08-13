@@ -9,6 +9,7 @@ import zlib
 import StringIO
 import gzip
 import re
+import os
 import random
 import datetime
 import multiprocessing
@@ -66,7 +67,6 @@ class Agent(multiprocessing.Process):
 		}
 		self.cookieDict.update(cookieDict)
 		self.headers['Cookie'] = make_cookies(self.cookieDict)
-		self.httpClient = httplib.HTTPConnection("guahao.zjol.com.cn", 80)
 		self.firstQueue = True
 		self.errmax = errmax
 		self.doctorname_Choice = doctorname_Choice
@@ -122,7 +122,7 @@ class Agent(multiprocessing.Process):
 			return None
 		return dlist
 
-	def step_3(self, yanzhenma_URL):
+	def step_3(self, yanzhenma_URL, yzm_filename):
 		self.httpClient.request("GET", yanzhenma_URL, headers=self.headers)
 		response = self.httpClient.getresponse()
 		encoding = response.getheader('Content-Encoding')
@@ -135,7 +135,7 @@ class Agent(multiprocessing.Process):
 		if encoding == 'gzip':
 			data = http_gzip(data)
 
-		fp = open(self.yzm_filename, 'wb')
+		fp = open(yzm_filename, 'wb')
 		fp.write(data)
 		fp.close()
 		return True
@@ -187,7 +187,8 @@ class Agent(multiprocessing.Process):
 					hyid, number, time, flag = order.split('|')
 					yanzhenma_URL = yanzhenma_URL_f % hyid
 					# yzm_filename = yzm_filename_f % hyid
-					yzm_filename = yzm_filename_f % 'yzm'
+					# yzm_filename = yzm_filename_f % 'yzm'
+					yzm_filename = yzm_filename_f % str(os.getpid())
 					if flag == '1':
 						# 该号被禁止抢
 						continue
@@ -237,8 +238,7 @@ class Agent(multiprocessing.Process):
 			yyQueue = self.refresh_yy()
 
 		if self.event.is_set():
-			import time
-			time.sleep(1)
+			print self.pid, 'wait for other process'
 			return False
 
 		while len(yyQueue) > 0:
@@ -276,17 +276,17 @@ class Agent(multiprocessing.Process):
 				time = info['time']
 				time_s = info['time_s']
 				yzm_filename = info['yzm_filename']
+				yanzhenma_URL = info['yanzhenma_URL']
 				n_orders = info['n_orders']
 
-				print ' '.join([patient, hospital, office, doctor, date])
+				print ' '.join([patient, hospital, office, doctor, date, str(hyid)])
 				print '一共有%d个号子 选择了第%d个' % (n_orders, cur_choose)
 
 				with EventLocker(self.event):
 
 					# 下载验证码
 					with Timer('GET yanzhenma'):
-						yanzhenma_URL = info['yanzhenma_URL']
-						if not self.step_3(yanzhenma_URL):
+						if not self.step_3(yanzhenma_URL, yzm_filename):
 							return False
 					
 					# yzm = raw_input('input %s code (empty use OCR):' % yzm_filename)
@@ -295,7 +295,7 @@ class Agent(multiprocessing.Process):
 					msg += '-'*20 + '\n'
 					msg += '一共有%d个号子\n选择了第%d个\n' % (n_orders, cur_choose)
 					msg += ''.join([number, '号/', time_s])
-					dlg = msgbox.InputBox(title ='预约', imgfile = yzm_filename, msg = msg)
+					dlg = msgbox.InputBox(title ='预约' + str(self.pid), imgfile = yzm_filename, msg = msg)
 					with Timer('your input'):
 						dlg.mainloop()
 					yzm = dlg.code
@@ -351,8 +351,8 @@ class Agent(multiprocessing.Process):
 
 
 	def run(self):
-		print self.pid, 'running...'
-		DebugLog('proc', True)
+		self.httpClient = httplib.HTTPConnection("guahao.zjol.com.cn", 80)
+		DebugLog('proc', False, True)
 
 		errcnt = 0
 		while not self.okEvent.is_set():

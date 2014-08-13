@@ -16,7 +16,7 @@ import multiprocessing
 
 import msgbox
 import debuglog
-from debuglog import Timer
+from debuglog import Timer, DebugLog
 
 
 nowtime = lambda : str(datetime.datetime.now())
@@ -174,7 +174,7 @@ def main(user, passw):
 		print '开始刷号子', chanke_Name
 
 		try:
-			for i in xrange(3):
+			for i in xrange(5):
 				proc = agent.Agent(args=(event, okEvent))
 				proc.setInfo(cookieDict, chanke_Referer, chanke_Name, doctorname_Choice, errmax)
 				procs.append(proc)
@@ -211,7 +211,7 @@ def parseArgs():
 	return args
 
 if __name__ == '__main__':
-
+	DebugLog('guahao', True)
 	random.seed(time.time())
 	multiprocessing.freeze_support()
 

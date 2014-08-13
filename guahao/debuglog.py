@@ -41,17 +41,18 @@ class EventLocker(object):
 
 	def __exit__(self, *args):
 		self.ev.clear()
+		time.sleep(1)
 
 class DebugLog(object):
-	def __init__(self, filename = None, console = True):
-		print self, 'in process', os.getpid(), 'sys.stdout =', type(sys.stdout)
-		self.buff = ''
+	def __init__(self, filename = None, console = True, proc = False):
+		print 'DebugLog in process', os.getpid(), 'sys.stdout =', type(sys.stdout)
+		self.proc = proc
 		self.sys_out = sys.stdout
 		self.sys_err = sys.stderr
 		self.console = console
 		self.logfile = None
 		if filename is not None:
-			self.logfile = open(filename + str(os.getpid()) + '.log', 'a+')
+			self.logfile = open(filename + str(os.getpid()) + '.log', 'w') if self.proc else open(filename + '.log', 'a+')
 			# self.logfile = open(filename + '.log', 'a+')
 			self.logfile.write('='*50 + '\n')
 			self.logfile.write(str(datetime.now()) + '\n')
@@ -77,4 +78,3 @@ class DebugLog(object):
 		if self.logfile:
 			self.logfile.flush()
 
-DebugLog('guahao', True)
